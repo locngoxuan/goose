@@ -6,7 +6,7 @@ import (
 
 // Version prints the current version of the database.
 func Version(db *sql.DB, dir string) error {
-	current, err := GetDBVersion(db)
+	current, err := GetDBVersion(unknownRange, db)
 	if err != nil {
 		return err
 	}

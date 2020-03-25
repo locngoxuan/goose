@@ -17,7 +17,7 @@ func Status(db *sql.DB, dir string) error {
 	}
 
 	// must ensure that the version table exists if we're running on a pristine DB
-	if _, err := EnsureDBVersion(db); err != nil {
+	if _, err := EnsureDBVersion(unknownRange, db); err != nil {
 		return errors.Wrap(err, "failed to ensure DB version")
 	}
 

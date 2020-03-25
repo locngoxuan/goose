@@ -236,8 +236,8 @@ func versionFilter(v, current, target int64) bool {
 
 // EnsureDBVersion retrieves the current version for this DB.
 // Create and initialize the DB version table if it doesn't exist.
-func EnsureDBVersion(db *sql.DB) (int64, error) {
-	rows, err := GetDialect().dbVersionQuery(db)
+func EnsureDBVersion(r []int, db *sql.DB) (int64, error) {
+	rows, err := GetDialect().dbVersionQuery(r, db)
 	if err != nil {
 		return 0, createVersionTable(db)
 	}
@@ -309,8 +309,8 @@ func createVersionTable(db *sql.DB) error {
 }
 
 // GetDBVersion is an alias for EnsureDBVersion, but returns -1 in error.
-func GetDBVersion(db *sql.DB) (int64, error) {
-	version, err := EnsureDBVersion(db)
+func GetDBVersion(r []int, db *sql.DB) (int64, error) {
+	version, err := EnsureDBVersion(r, db)
 	if err != nil {
 		return -1, err
 	}

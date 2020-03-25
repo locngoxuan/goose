@@ -15,11 +15,16 @@ var (
 	verbose = flags.Bool("v", false, "enable verbose mode")
 	help    = flags.Bool("h", false, "print help")
 	version = flags.Bool("version", false, "print version")
+	dbLevel = flags.String("db-level", "", "level of database, i.e. product, project")
 )
 
 func main() {
 	flags.Usage = usage
-	flags.Parse(os.Args[1:])
+	err := flags.Parse(os.Args[1:])
+	if err != nil {
+		flags.Usage()
+		return
+	}
 
 	if *version {
 		fmt.Println(goose.VERSION)
@@ -37,12 +42,12 @@ func main() {
 
 	switch args[0] {
 	case "create":
-		if err := goose.Run("create", nil, *dir, args[1:]...); err != nil {
+		if err := goose.Run("create", "", nil, *dir, args[1:]...); err != nil {
 			log.Fatalf("goose run: %v", err)
 		}
 		return
 	case "fix":
-		if err := goose.Run("fix", nil, *dir); err != nil {
+		if err := goose.Run("fix", "", nil, *dir); err != nil {
 			log.Fatalf("goose run: %v", err)
 		}
 		return
@@ -64,8 +69,7 @@ func main() {
 	if len(args) > 3 {
 		arguments = append(arguments, args[3:]...)
 	}
-
-	if err := goose.Run(command, db, *dir, arguments...); err != nil {
+	if err := goose.Run(command, *dbLevel, db, *dir, arguments...); err != nil {
 		log.Fatalf("goose run: %v", err)
 	}
 }
@@ -81,23 +85,13 @@ var (
 
 Drivers:
     postgres
-    mysql
-    sqlite3
-    mssql
-    redshift
+    oracle
 
 Examples:
-    goose sqlite3 ./foo.db status
-    goose sqlite3 ./foo.db create init sql
-    goose sqlite3 ./foo.db create add_some_column sql
-    goose sqlite3 ./foo.db create fetch_user_data go
-    goose sqlite3 ./foo.db up
+    goose create add_new_table sql
 
-    goose postgres "user=postgres dbname=postgres sslmode=disable" status
-    goose mysql "user:password@/dbname?parseTime=true" status
-    goose redshift "postgres://user:password@qwerty.us-east-1.redshift.amazonaws.com:5439/db" status
-    goose tidb "user:password@/dbname?parseTime=true" status
-    goose mssql "sqlserver://user:password@dbname:1433?database=master" status
+    goose postgres "postgres://username:password@host[:port]/table?sslmode=disable" status
+    goose oracle "username/password@[//]host[:port][/service_name][:server][/instance_name]" status
 
 Options:
 `

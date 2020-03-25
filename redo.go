@@ -5,8 +5,8 @@ import (
 )
 
 // Redo rolls back the most recently applied migration, then runs it again.
-func Redo(db *sql.DB, dir string) error {
-	currentVersion, err := GetDBVersion(db)
+func Redo(db *sql.DB, dir string, r []int) error {
+	currentVersion, err := GetDBVersion(r, db)
 	if err != nil {
 		return err
 	}

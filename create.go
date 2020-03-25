@@ -22,11 +22,7 @@ func CreateWithTemplate(db *sql.DB, dir string, tmpl *template.Template, name, m
 	filename := fmt.Sprintf("%v_%v.%v", version, snakeCase(name), migrationType)
 
 	if tmpl == nil {
-		if migrationType == "go" {
-			tmpl = goSQLMigrationTemplate
-		} else {
-			tmpl = sqlMigrationTemplate
-		}
+		tmpl = sqlMigrationTemplate
 	}
 
 	path := filepath.Join(dir, filename)
@@ -66,26 +62,4 @@ SELECT 'up SQL query';
 -- +goose StatementBegin
 SELECT 'down SQL query';
 -- +goose StatementEnd
-`))
-
-var goSQLMigrationTemplate = template.Must(template.New("goose.go-migration").Parse(`package migrations
-
-import (
-	"database/sql"
-	"github.com/pressly/goose"
-)
-
-func init() {
-	goose.AddMigration(up{{.CamelName}}, down{{.CamelName}})
-}
-
-func up{{.CamelName}}(tx *sql.Tx) error {
-	// This code is executed when the migration is applied.
-	return nil
-}
-
-func down{{.CamelName}}(tx *sql.Tx) error {
-	// This code is executed when the migration is rolled back.
-	return nil
-}
 `))
