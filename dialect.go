@@ -13,6 +13,7 @@ type SQLDialect interface {
 	deleteVersionSQL() string      // sql string to delete version
 	migrationSQL() string          // sql string to retrieve migrations
 	dbVersionQuery(inRange []int, db *sql.DB) (*sql.Rows, error)
+	booleanValue(value bool) interface{}
 }
 
 var dialect SQLDialect = &PostgresDialect{}
@@ -23,6 +24,16 @@ var (
                 version_id bigint NOT NULL,
                 is_applied boolean NOT NULL,
                 tstamp timestamp NULL default now(),
+                PRIMARY KEY(id)
+            );`
+
+	oracleTable = `CREATE SEQUENCE goose_seq START WITH 1;
+
+CREATE TABLE %s (
+            	id NUMBER(19) DEFAULT goose_seq.nextval NOT NULL,
+                version_id BIGINT NUMBER(19,0),
+                is_applied NUMBER(1) DEFAULT 0 NOT NULL,
+                tstamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY(id)
             );`
 )
@@ -71,10 +82,55 @@ func (pg PostgresDialect) dbVersionQuery(inRange []int, db *sql.DB) (*sql.Rows, 
 	return rows, err
 }
 
+func (pg PostgresDialect) booleanValue(value bool) interface{}{
+	return value
+}
+
 func (m PostgresDialect) migrationSQL() string {
 	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=$1 ORDER BY tstamp DESC LIMIT 1", TableName())
 }
 
 func (pg PostgresDialect) deleteVersionSQL() string {
+	return fmt.Sprintf("DELETE FROM %s WHERE version_id=$1;", TableName())
+}
+
+////////////////////////////
+// Postgres
+////////////////////////////
+
+// PostgresDialect struct.
+type OracleDialect struct{}
+
+func (pg OracleDialect) createVersionTableSQL() string {
+	return fmt.Sprintf(oracleTable, TableName())
+}
+
+func (pg OracleDialect) insertVersionSQL() string {
+	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES ($1, $2);", TableName())
+}
+
+func (pg OracleDialect) booleanValue(value bool) interface{}{
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func (pg OracleDialect) dbVersionQuery(inRange []int, db *sql.DB) (*sql.Rows, error) {
+	rows, err := db.Query(fmt.Sprintf(`SELECT version_id, is_applied from %s 
+												where version_id >= %d and version_id < %d ORDER BY id DESC`,
+		TableName(), inRange[0], inRange[1]))
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, err
+}
+
+func (m OracleDialect) migrationSQL() string {
+	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=$1 ORDER BY tstamp DESC LIMIT 1", TableName())
+}
+
+func (pg OracleDialect) deleteVersionSQL() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE version_id=$1;", TableName())
 }

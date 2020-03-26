@@ -300,7 +300,7 @@ func createVersionTable(db *sql.DB) error {
 
 	version := 0
 	applied := true
-	if _, err := txn.Exec(d.insertVersionSQL(), version, applied); err != nil {
+	if _, err := txn.Exec(d.insertVersionSQL(), version, d.booleanValue(applied)); err != nil {
 		txn.Rollback()
 		return err
 	}

@@ -11,7 +11,7 @@ vendor:
 dev:
 	@mkdir -p ./bin
 	@rm -f ./bin/*
-	env CGO_ENABLED=0 go build -tags='no_mssql no_mysql no_sqlite3' -o ./bin/goose ./cmd/goose
+	env CGO_ENABLED=1 go build -tags='no_mssql no_mysql no_sqlite3' -o ./bin/goose ./cmd/goose
 
 dist:
 	@mkdir -p ./bin

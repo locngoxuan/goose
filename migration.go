@@ -73,52 +73,6 @@ func (m *Migration) run(db *sql.DB, direction bool) error {
 		} else {
 			log.Println("EMPTY", filepath.Base(m.Source))
 		}
-
-	case ".go":
-		if !m.Registered {
-			return errors.Errorf("ERROR %v: failed to run Go migration: Go functions must be registered and built into a custom binary (see https://github.com/pressly/goose/tree/master/examples/go-migrations)", m.Source)
-		}
-		tx, err := db.Begin()
-		if err != nil {
-			return errors.Wrap(err, "ERROR failed to begin transaction")
-		}
-
-		fn := m.UpFn
-		if !direction {
-			fn = m.DownFn
-		}
-
-		if fn != nil {
-			// Run Go migration function.
-			if err := fn(tx); err != nil {
-				tx.Rollback()
-				return errors.Wrapf(err, "ERROR %v: failed to run Go migration function %T", filepath.Base(m.Source), fn)
-			}
-		}
-
-		if direction {
-			if _, err := tx.Exec(GetDialect().insertVersionSQL(), m.Version, direction); err != nil {
-				tx.Rollback()
-				return errors.Wrap(err, "ERROR failed to execute transaction")
-			}
-		} else {
-			if _, err := tx.Exec(GetDialect().deleteVersionSQL(), m.Version); err != nil {
-				tx.Rollback()
-				return errors.Wrap(err, "ERROR failed to execute transaction")
-			}
-		}
-
-		if err := tx.Commit(); err != nil {
-			return errors.Wrap(err, "ERROR failed to commit transaction")
-		}
-
-		if fn != nil {
-			log.Println("OK   ", filepath.Base(m.Source))
-		} else {
-			log.Println("EMPTY", filepath.Base(m.Source))
-		}
-
-		return nil
 	}
 
 	return nil
