@@ -36,13 +36,13 @@ func runSQLMigration(db *sql.DB, statements []string, useTx bool, v int64, direc
 		}
 
 		if direction {
-			if _, err := tx.Exec(GetDialect().insertVersionSQL(), v, GetDialect().booleanValue(direction)); err != nil {
+			if _, err := tx.Exec(GetDialect().insertVersionSQL(int(v), direction)); err != nil {
 				verboseInfo("Rollback transaction")
 				tx.Rollback()
 				return errors.Wrap(err, "failed to insert new goose version")
 			}
 		} else {
-			if _, err := tx.Exec(GetDialect().deleteVersionSQL(), v); err != nil {
+			if _, err := tx.Exec(GetDialect().deleteVersionSQL(int(v))); err != nil {
 				verboseInfo("Rollback transaction")
 				tx.Rollback()
 				return errors.Wrap(err, "failed to delete goose version")
@@ -64,7 +64,7 @@ func runSQLMigration(db *sql.DB, statements []string, useTx bool, v int64, direc
 			return errors.Wrapf(err, "failed to execute SQL query %q", clearStatement(query))
 		}
 	}
-	if _, err := db.Exec(GetDialect().insertVersionSQL(), v, GetDialect().booleanValue(direction)); err != nil {
+	if _, err := db.Exec(GetDialect().insertVersionSQL(int(v), direction)); err != nil {
 		return errors.Wrap(err, "failed to insert new goose version")
 	}
 

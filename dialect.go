@@ -8,10 +8,11 @@ import (
 // SQLDialect abstracts the details of specific SQL dialects
 // for goose's few SQL specific statements
 type SQLDialect interface {
-	createVersionTableSQL() string // sql string to create the db version table
-	insertVersionSQL() string      // sql string to insert the initial version table row
-	deleteVersionSQL() string      // sql string to delete version
-	migrationSQL() string          // sql string to retrieve migrations
+	preCreateVersionTableSQL() string
+	createVersionTableSQL() string                       // sql string to create the db version table
+	insertVersionSQL(version int, isApplied bool) string // sql string to insert the initial version table row
+	deleteVersionSQL(version int) string                 // sql string to delete version
+	migrationSQL(version int) string                     // sql string to retrieve migrations
 	dbVersionQuery(inRange []int, db *sql.DB) (*sql.Rows, error)
 	booleanValue(value bool) interface{}
 }
@@ -27,15 +28,15 @@ var (
                 PRIMARY KEY(id)
             );`
 
-	oracleTable = `CREATE SEQUENCE goose_seq START WITH 1;
+	preCreateTableOracle = `CREATE SEQUENCE goose_seq START WITH 1 increment by 1`
 
-CREATE TABLE %s (
+	oracleTable = `CREATE TABLE %s (
             	id NUMBER(19) DEFAULT goose_seq.nextval NOT NULL,
-                version_id BIGINT NUMBER(19,0),
+                version_id NUMBER(19,0),
                 is_applied NUMBER(1) DEFAULT 0 NOT NULL,
-                tstamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                tstamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY(id)
-            );`
+            )`
 )
 
 // GetDialect gets the SQLDialect
@@ -49,6 +50,7 @@ func SetDialect(d string) error {
 	case "postgres":
 		dialect = &PostgresDialect{}
 	case "oracle":
+		dialect = &OracleDialect{}
 	default:
 		return fmt.Errorf("%q: unknown dialect", d)
 	}
@@ -63,12 +65,16 @@ func SetDialect(d string) error {
 // PostgresDialect struct.
 type PostgresDialect struct{}
 
+func (pg PostgresDialect) preCreateVersionTableSQL() string {
+	return ""
+}
+
 func (pg PostgresDialect) createVersionTableSQL() string {
 	return fmt.Sprintf(postgresTable, TableName())
 }
 
-func (pg PostgresDialect) insertVersionSQL() string {
-	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES ($1, $2);", TableName())
+func (pg PostgresDialect) insertVersionSQL(version int, isApplied bool) string {
+	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES (%d, %v);", TableName(), version, isApplied)
 }
 
 func (pg PostgresDialect) dbVersionQuery(inRange []int, db *sql.DB) (*sql.Rows, error) {
@@ -82,16 +88,16 @@ func (pg PostgresDialect) dbVersionQuery(inRange []int, db *sql.DB) (*sql.Rows, 
 	return rows, err
 }
 
-func (pg PostgresDialect) booleanValue(value bool) interface{}{
+func (pg PostgresDialect) booleanValue(value bool) interface{} {
 	return value
 }
 
-func (m PostgresDialect) migrationSQL() string {
-	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=$1 ORDER BY tstamp DESC LIMIT 1", TableName())
+func (m PostgresDialect) migrationSQL(version int) string {
+	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=%d ORDER BY tstamp DESC LIMIT 1", TableName(), version)
 }
 
-func (pg PostgresDialect) deleteVersionSQL() string {
-	return fmt.Sprintf("DELETE FROM %s WHERE version_id=$1;", TableName())
+func (pg PostgresDialect) deleteVersionSQL(version int) string {
+	return fmt.Sprintf("DELETE FROM %s WHERE version_id=%d;", TableName(), version)
 }
 
 ////////////////////////////
@@ -101,15 +107,20 @@ func (pg PostgresDialect) deleteVersionSQL() string {
 // PostgresDialect struct.
 type OracleDialect struct{}
 
+func (pg OracleDialect) preCreateVersionTableSQL() string {
+	return preCreateTableOracle
+}
+
 func (pg OracleDialect) createVersionTableSQL() string {
 	return fmt.Sprintf(oracleTable, TableName())
 }
 
-func (pg OracleDialect) insertVersionSQL() string {
-	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES ($1, $2);", TableName())
+func (pg OracleDialect) insertVersionSQL(version int, isApplied bool) string {
+	v := pg.booleanValue(isApplied).(int)
+	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES (%d, %d)", TableName(), version, v)
 }
 
-func (pg OracleDialect) booleanValue(value bool) interface{}{
+func (pg OracleDialect) booleanValue(value bool) interface{} {
 	if value {
 		return 1
 	}
@@ -127,10 +138,10 @@ func (pg OracleDialect) dbVersionQuery(inRange []int, db *sql.DB) (*sql.Rows, er
 	return rows, err
 }
 
-func (m OracleDialect) migrationSQL() string {
-	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=$1 ORDER BY tstamp DESC LIMIT 1", TableName())
+func (m OracleDialect) migrationSQL(version int) string {
+	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=%d ORDER BY tstamp DESC LIMIT 1", TableName(), version)
 }
 
-func (pg OracleDialect) deleteVersionSQL() string {
-	return fmt.Sprintf("DELETE FROM %s WHERE version_id=$1;", TableName())
+func (pg OracleDialect) deleteVersionSQL(version int) string {
+	return fmt.Sprintf("DELETE FROM %s WHERE version_id=%d", TableName(), version)
 }

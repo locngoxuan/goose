@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -293,15 +294,22 @@ func createVersionTable(db *sql.DB) error {
 
 	d := GetDialect()
 
+	if strings.TrimSpace(d.preCreateVersionTableSQL()) != "" {
+		if _, err := txn.Exec(d.preCreateVersionTableSQL()); err != nil {
+			_ = txn.Rollback()
+			return err
+		}
+	}
+
 	if _, err := txn.Exec(d.createVersionTableSQL()); err != nil {
-		txn.Rollback()
+		_ = txn.Rollback()
 		return err
 	}
 
 	version := 0
 	applied := true
-	if _, err := txn.Exec(d.insertVersionSQL(), version, d.booleanValue(applied)); err != nil {
-		txn.Rollback()
+	if _, err := txn.Exec(d.insertVersionSQL(version, applied)); err != nil {
+		_ = txn.Rollback()
 		return err
 	}
 
