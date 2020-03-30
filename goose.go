@@ -28,6 +28,7 @@ var unknownRange = []int{0, int(maxVersion)}
 
 // Run runs a goose command.
 func Run(command, dbLevel string, db *sql.DB, dir string, args ...string) error {
+	log.Printf("goose command=%s dbLevel=%s dir=%s args=%v ", command, dbLevel, dir, args)
 	r := unknownRange
 	if dbLevel == "product" {
 		r = productRange

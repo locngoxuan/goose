@@ -178,28 +178,6 @@ func CollectMigrations(dirpath string, current, target int64) (Migrations, error
 		}
 	}
 
-	// Go migration files
-	goMigrationFiles, err := filepath.Glob(dirpath + "/**.go")
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range goMigrationFiles {
-		v, err := NumericComponent(file)
-		if err != nil {
-			continue // Skip any files that don't have version prefix.
-		}
-
-		// Skip migrations already existing migrations registered via goose.AddMigration().
-		if _, ok := registeredGoMigrations[v]; ok {
-			continue
-		}
-
-		if versionFilter(v, current, target) {
-			migration := &Migration{Version: v, Next: -1, Previous: -1, Source: file, Registered: false}
-			migrations = append(migrations, migration)
-		}
-	}
-
 	migrations = sortAndConnectMigrations(migrations)
 
 	return migrations, nil
@@ -247,7 +225,6 @@ func EnsureDBVersion(r []int, db *sql.DB) (int64, error) {
 	// The most recent record for each migration specifies
 	// whether it has been applied or rolled back.
 	// The first version we find that has been applied is the current version.
-
 	toSkip := make([]int64, 0)
 
 	for rows.Next() {
@@ -277,6 +254,7 @@ func EnsureDBVersion(r []int, db *sql.DB) (int64, error) {
 		// latest version of migration has not been applied.
 		toSkip = append(toSkip, row.VersionID)
 	}
+
 	if err := rows.Err(); err != nil {
 		return 0, errors.Wrap(err, "failed to get next row")
 	}
@@ -320,6 +298,9 @@ func createVersionTable(db *sql.DB) error {
 func GetDBVersion(r []int, db *sql.DB) (int64, error) {
 	version, err := EnsureDBVersion(r, db)
 	if err != nil {
+		if err == ErrNoNextVersion{
+			return 0, nil
+		}
 		return -1, err
 	}
 
