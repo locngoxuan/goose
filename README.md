@@ -6,33 +6,20 @@ Goose is a database migration tool. Manage your database schema by creating incr
 
 ### Goals of this fork
 
-`github.com/pressly/goose` is a fork of `bitbucket.org/liamstask/goose` with the following changes:
-- No config files
-- [Default goose binary](./cmd/goose/main.go) can migrate SQL files only
-- Go migrations:
-    - We don't `go build` Go migrations functions on-the-fly
-      from within the goose binary
-    - Instead, we let you
-      [create your own custom goose binary](examples/go-migrations),
-      register your Go migration functions explicitly and run complex
-      migrations with your own `*sql.DB` connection
-    - Go migration functions let you run your code within
-      an SQL transaction, if you use the `*sql.Tx` argument
-- The goose pkg is decoupled from the binary:
-    - goose pkg doesn't register any SQL drivers anymore,
-      thus no driver `panic()` conflict within your codebase!
-    - goose pkg doesn't have any vendor dependencies anymore
-- We use timestamped migrations by default but recommend a hybrid approach of using timestamps in the development process and sequential versions in production.
+`github.com/locngoxuan/goose` is a fork of `github.com/pressly/goose` with the following changes:
+
+- Removing go migrations
+- Add oracle support
 
 # Install
 
-    $ go get -u github.com/pressly/goose/cmd/goose
+    $ go get -u github.com/locngoxuan/goose
 
 This will install the `goose` binary to your `$GOPATH/bin` directory.
 
 For a lite version of the binary without DB connection dependent commands, use the exclusive build tags:
 
-    $ go build -tags='no_postgres no_mysql no_sqlite3' -i -o goose ./cmd/goose
+    $ make dev
 
 
 # Usage
@@ -42,26 +29,18 @@ Usage: goose [OPTIONS] DRIVER DBSTRING COMMAND
 
 Drivers:
     postgres
-    mysql
-    sqlite3
-    mssql
-    redshift
+    oracle
 
 Examples:
-    goose sqlite3 ./foo.db status
-    goose sqlite3 ./foo.db create init sql
-    goose sqlite3 ./foo.db create add_some_column sql
-    goose sqlite3 ./foo.db create fetch_user_data go
-    goose sqlite3 ./foo.db up
+    goose create add_new_table sql
 
-    goose postgres "user=postgres dbname=postgres sslmode=disable" status
-    goose mysql "user:password@/dbname?parseTime=true" status
-    goose redshift "postgres://user:password@qwerty.us-east-1.redshift.amazonaws.com:5439/db" status
-    goose tidb "user:password@/dbname?parseTime=true" status
-    goose mssql "sqlserver://user:password@dbname:1433?database=master" status
+    goose postgres "postgres://username:password@host[:port]/table?sslmode=disable" status
+    goose oracle "username/password@[//]host[:port][/service_name][:server][/instance_name]" status
 
 Options:
 
+  -db-level string
+    	level of database, i.e. product, project
   -dir string
     	directory with migration files (default ".")
   -h	print help
@@ -79,7 +58,7 @@ Commands:
     reset                Roll back all migrations
     status               Dump the migration status for the current DB
     version              Print the current version of the database
-    create NAME [sql|go] Creates new migration file with the current timestamp
+    create NAME [sql]    Creates new migration file with the current timestamp
     fix                  Apply sequential ordering to migrations
 ```
 
@@ -91,11 +70,6 @@ Create a new SQL migration.
     $ Created new file: 20170506082420_add_some_column.sql
 
 Edit the newly created file to define the behavior of your migration.
-
-You can also create a Go migration, if you then invoke it with [your own goose binary](#go-migrations):
-
-    $ goose create fetch_user_data go
-    $ Created new file: 20170506082421_fetch_user_data.go
 
 ## up
 
@@ -159,8 +133,8 @@ Note: for MySQL [parseTime flag](https://github.com/go-sql-driver/mysql#parsetim
 
 Print the current version of the database:
 
-    $ goose version
-    $ goose: version 002
+    $ goose -version
+    $ v2.7.0-rc3
 
 # Migrations
 
@@ -217,52 +191,6 @@ $$
 language plpgsql;
 -- +goose StatementEnd
 ```
-
-## Go Migrations
-
-1. Create your own goose binary, see [example](./examples/go-migrations)
-2. Import `github.com/pressly/goose`
-3. Register your migration functions
-4. Run goose command, ie. `goose.Up(db *sql.DB, dir string)`
-
-A [sample Go migration 00002_users_add_email.go file](./examples/go-migrations/00002_rename_root.go) looks like:
-
-```go
-package migrations
-
-import (
-	"database/sql"
-
-	"github.com/pressly/goose"
-)
-
-func init() {
-	goose.AddMigration(Up, Down)
-}
-
-func Up(tx *sql.Tx) error {
-	_, err := tx.Exec("UPDATE users SET username='admin' WHERE username='root';")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func Down(tx *sql.Tx) error {
-	_, err := tx.Exec("UPDATE users SET username='root' WHERE username='admin';")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-```
-
-# Hybrid Versioning
-Please, read the [versioning problem](https://github.com/pressly/goose/issues/63#issuecomment-428681694) first.
-
-We strongly recommend adopting a hybrid versioning approach, using both timestamps and sequential numbers. Migrations created during the development process are timestamped and sequential versions are ran on production. We believe this method will prevent the problem of conflicting versions when writing software in a team environment.
-
-To help you adopt this approach, `create` will use the current timestamp as the migration version. When you're ready to deploy your migrations in a production environment, we also provide a helpful `fix` command to convert your migrations into sequential order, while preserving the timestamp ordering. We recommend running `fix` in the CI pipeline, and only when the migrations are ready for production.
 
 ## License
 
